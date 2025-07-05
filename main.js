@@ -10,8 +10,9 @@ const vs = `
   varying vec2 uv;
   void main() {
     gl_Position = vec4(position, 0, 1);
-    uv = position * 0.5 + 0.5;
+    uv = vec2(position.x * 0.5 + 0.5, -position.y * 0.5 + 0.5);
   }`;
+//TODO explain uv 0.5
 const fs = `
   precision highp float;
   uniform sampler2D texture;
@@ -47,21 +48,78 @@ gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
 // 5. Animation variables (RGB only)
-const [w, h] = [200, 150];
-const pixels = new Uint8Array(w * h * 3);
+const [w, h] = [400, 300];
+const mem = new ArrayBuffer(w * h * 3);
+const pixels = new Uint8Array(mem);
 let time = 0;
+
+
+
+alphanumerics = `
+.XXX. XXXX. .XXX. XXXX. XXXXX XXXXX .XXX. X...X .XXX. ....X X...X X.... 
+X...X X...X X...X X...X X.... X.... X...X X...X ..X.. ....X X..X. X.... 
+X...X X...X X.... X...X X.... X.... X.... X...X ..X.. ....X X.X.. X.... 
+X...X XXXX. X.... X...X XXXX. XXXX. X.XXX XXXXX ..X.. ....X XX... X.... 
+XXXXX X...X X.... X...X X.... X.... X...X X...X ..X.. X...X X.X.. X.... 
+X...X X...X X...X X...X X.... X.... X...X X...X ..X.. X...X X..X. X.... 
+X...X XXXX. .XXX. XXXX. XXXXX X.... .XXX. X...X .XXX. .XXX. X...X XXXXX 
+..... ..... ..... ..... ..... ..... ..... ..... ..... ..... ..... ..... 
+
+X...X X...X .XXX. XXXX. .XXX. XXXX. .XXX. XXXXX X...X X...X X...X X...X 
+XX.XX XX..X X...X X...X X...X X...X X...X ..X.. X...X X...X X...X X...X 
+X.X.X X.X.X X...X X...X X...X X...X X.... ..X.. X...X X...X X...X .X.X. 
+X...X X..XX X...X XXXX. X...X XXXX. .XXX. ..X.. X...X X...X X...X ..X.. 
+X...X X...X X...X X.... X.X.X X..X. ....X ..X.. X...X X...X X.X.X .X.X. 
+X...X X...X X...X X.... X..X. X...X X...X ..X.. X...X .X.X. X.X.X X...X 
+X...X X...X .XXX. X.... .XX.X X...X .XXX. ..X.. .XXX. ..X.. .X.X. X...X 
+..... ..... ..... ..... ..... ..... ..... ..... ..... ..... ..... ..... 
+
+X...X XXXXX ..x.. ...x. ..x.. ..x.. ...x. .xxx. ...x. .xxx. ..x.. ..x.. 
+X...X ....X .x.x. ..xx. .x.x. .x.x. ..x.. .x... ..x.. ...x. .x.x. .x.x. 
+X...X ...X. .x.x. .x.x. ...x. ...x. .x... .x... .x... ...x. .x.x. .x.x. 
+.X.X. ..X.. .x.x. ...x. ..x.. ..x.. .x.x. ..x.. .xx.. .xx.. ..x.. ..xx. 
+..X.. .X... .x.x. ...x. .x... ...x. .xxx. ...x. .x.x. ..x.. .x.x. ...x. 
+..X.. X.... .x.x. ...x. .x... .x.x. ...x. ...x. .x.x. .x... .x.x. ..x.. 
+..X.. XXXXX ..x.. ...x. .xxx. ..x.. ...x. .xx.. ..x.. .x... ..x.. .x... 
+..... ..... ..... ..... ..... ..... ..... ..... ..... ..... ..... ..... 
+`
+
+
+max = (x, y) => x > y ? x : y;
+min = (x, y) => x < y ? x : y;
+
+function fontLoad(font) {
+  let c_last = '\n';
+  let x = -1;
+  let y = 0;
+  let xoff = 0;
+  let x_max = 0;
+  for (c of font) {
+    if (c != ' ') { 
+      if (c == '\n') {
+        if (c_last == '\n') {
+          xoff = x_max;
+          y = 0;
+        } else {
+          x_max = max(x, x_max);
+          ++y;
+        }
+        x = xoff;
+      } else {
+        px = c != '.' ? 1 : 0;
+        pixels[(y*w+x)*3] = px * 255;
+        ++x;
+      }
+    }
+    c_last = c;
+  }
+}
+fontLoad(alphanumerics);
+
 
 // 6. Animation loop
 function animate() {
   time += 0.02;
-  
-  for (let i = 0; i < pixels.length; i += 3) {
-    const x = (i/3) % w;
-    const y = Math.floor((i/3) / w);
-    pixels[i]   = 128 + 127 * Math.sin(x/w * 8 + time);
-    pixels[i+1] = 128 + 127 * Math.cos(y/h * 6 + time * 1.3);
-    pixels[i+2] = 128 + 127 * Math.sin((x+y)/(w+h) * 10 + time * 2);
-  }
   
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, w, h, 0, gl.RGB, gl.UNSIGNED_BYTE, pixels);
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
