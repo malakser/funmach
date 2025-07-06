@@ -51,7 +51,6 @@ gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 const [w, h] = [400, 300];
 const mem = new ArrayBuffer(w * h * 3);
 const pixels = new Uint8Array(mem);
-let time = 0;
 
 
 
@@ -117,10 +116,34 @@ function fontLoad(font) {
 fontLoad(alphanumerics);
 
 
+
+let pc=0;
+
+function vm() {
+  pixels[pc] -= 1;
+  pc = (pc + 1) % pixels.length;
+}
+
+
+let time_last = performance.now();
+let dbg = document.getElementById('dbg');
+let steps = 1000000;
+
 // 6. Animation loop
 function animate() {
-  time += 0.02;
+  let time = performance.now();
+  let dt = time - time_last;
+  time_last = time;
+  let fps = 1/dt*1000;
+  let hz = steps * fps;
+  dbg.innerText = `
+  ${Math.round(fps * 100) / 100} FPS
+  ${Math.round(hz / 1000)} kHZ
+  `;
+
   
+  for (let i=0; i<steps; i++) vm();
+
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, w, h, 0, gl.RGB, gl.UNSIGNED_BYTE, pixels);
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   requestAnimationFrame(animate);
