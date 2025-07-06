@@ -125,9 +125,19 @@ function vm() {
 }
 
 
+let e_sum = 0
+//let ki = 200;
+//let kp = 10000;
+
+let ki = 1;
+let kp = 0;
+
 let time_last = performance.now();
 let dbg = document.getElementById('dbg');
-let steps = 1000000;
+let steps = 0;
+
+let fps_ref = 30;
+let hz_ref = 1000;
 
 // 6. Animation loop
 function animate() {
@@ -136,6 +146,14 @@ function animate() {
   time_last = time;
   let fps = 1/dt*1000;
   let hz = steps * fps;
+  let khz = hz / 1000;
+  
+  //let e = fps - fps_ref; 
+  //let e = hz - hz_ref; 
+  let e = hz_ref - khz; 
+  e_sum += e;
+  steps = e_sum * ki + e * kp;
+
   dbg.innerText = `
   ${Math.round(fps * 100) / 100} FPS
   ${Math.round(hz / 1000)} kHZ
