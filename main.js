@@ -116,17 +116,16 @@ fontLoad(alphanumerics);
 
 
 let pc = 0;
+let regs = Uint32Array[32];
 
 function vm() {
-  //pixels[pc] -= 1;
-  pc = (pc + 1) % pixels.length;
-
+  pc = (pc + 4) % mem.length;
 }
 
 
-let e_sum = 0
-let ki = 300;
-let kp = 10000;
+let e_int = 0;
+let ki = 50000;
+let kp = 0;
 
 function nround(x, n) {
   let factor = 10**n;
@@ -139,17 +138,21 @@ let steps = 0;
 
 let fps_ref = 30;
 
+const min = (x, y) => x < y ? x : y;
+const max = (x, y) => x > y ? x : y;
+
+
 // 6. Animation loop
 function animate() {
   let time = performance.now();
-  let dt = time - time_last;
+  let dt = (time - time_last) / 1000;
   time_last = time;
-  let fps = 1/dt*1000;
+  let fps = 1/dt;
   let hz = steps * fps;
   
   let e = fps - fps_ref; 
-  e_sum += e;
-  steps = e_sum * ki + e * kp;
+  e_int += e * dt;
+  steps = max(e_int * ki + e * kp, 1);
 
   dbg.innerText = `
   ${nround(fps, 2)} FPS
