@@ -84,23 +84,20 @@ X...X ...X. .x.x. .x.x. ...x. ...x. .x... .x... .x... ...x. .x.x. .x.x.
 `
 
 
-max = (x, y) => x > y ? x : y;
-min = (x, y) => x < y ? x : y;
-
 function fontLoad(font) {
   let c_last = '\n';
   let x = -1;
   let y = 0;
   let xoff = 0;
-  let x_max = 0;
+  let xoff_new = xoff;
   for (c of font) {
     if (c != ' ') { 
       if (c == '\n') {
         if (c_last == '\n') {
-          xoff = x_max;
+          xoff = xoff_new;
           y = 0;
         } else {
-          x_max = max(x, x_max);
+          xoff_new = x;
           ++y;
         }
         x = xoff;
@@ -113,31 +110,34 @@ function fontLoad(font) {
     c_last = c;
   }
 }
+
 fontLoad(alphanumerics);
 
 
 
-let pc=0;
+let pc = 0;
 
 function vm() {
-  pixels[pc] -= 1;
+  //pixels[pc] -= 1;
   pc = (pc + 1) % pixels.length;
+
 }
 
 
 let e_sum = 0
-//let ki = 200;
-//let kp = 10000;
+let ki = 300;
+let kp = 10000;
 
-let ki = 1;
-let kp = 0;
+function nround(x, n) {
+  let factor = 10**n;
+  return Math.round(x*factor)/factor;
+}
 
 let time_last = performance.now();
 let dbg = document.getElementById('dbg');
 let steps = 0;
 
 let fps_ref = 30;
-let hz_ref = 1000;
 
 // 6. Animation loop
 function animate() {
@@ -146,17 +146,14 @@ function animate() {
   time_last = time;
   let fps = 1/dt*1000;
   let hz = steps * fps;
-  let khz = hz / 1000;
   
-  //let e = fps - fps_ref; 
-  //let e = hz - hz_ref; 
-  let e = hz_ref - khz; 
+  let e = fps - fps_ref; 
   e_sum += e;
   steps = e_sum * ki + e * kp;
 
   dbg.innerText = `
-  ${Math.round(fps * 100) / 100} FPS
-  ${Math.round(hz / 1000)} kHZ
+  ${nround(fps, 2)} FPS
+  ${nround(hz / 10**6, 2)} MHz
   `;
 
   
