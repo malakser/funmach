@@ -1,9 +1,12 @@
-// 1. Initialize WebGL
 const canvas = document.getElementById('webglCanvas');
 const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
 if (!gl) throw new Error("WebGL not supported");
 
-// 2. Shader Program
+let time_last = performance.now();
+let dbg = document.getElementById('dbg');
+let steps = 0;
+
+
 const program = gl.createProgram();
 const vs = `
   attribute vec2 position;
@@ -13,6 +16,7 @@ const vs = `
     uv = vec2(position.x * 0.5 + 0.5, -position.y * 0.5 + 0.5);
   }`;
 //TODO explain uv 0.5
+//
 const fs = `
   precision highp float;
   uniform sampler2D texture;
@@ -50,7 +54,7 @@ gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 // 5. Animation variables (RGB only)
 const [w, h] = [400, 300];
 const mem = new ArrayBuffer(w * h * 3);
-const pixels = new Uint8Array(mem);
+const bytes = new Uint8Array(mem);
 
 
 
@@ -84,10 +88,10 @@ X...X ...X. .x.x. .x.x. ...x. ...x. .x... .x... .x... ...x. .x.x. .x.x.
 `
 
 
-function fontLoad(font) {
+function fontLoad(font, x1=0, y1=0) {
   let c_last = '\n';
   let x = -1;
-  let y = 0;
+  let y = x1;
   let xoff = 0;
   let xoff_new = xoff;
   for (c of font) {
@@ -103,7 +107,7 @@ function fontLoad(font) {
         x = xoff;
       } else {
         px = c != '.' ? 1 : 0;
-        pixels[(y*w+x)*3] = px * 255;
+        bytes[(y*w+x)*3] = px * 255;
         ++x;
       }
     }
@@ -119,24 +123,14 @@ let pc = 0;
 let regs = Uint32Array[32];
 
 function vm() {
-  pc = (pc + 4) % mem.length;
+  pc = (pc + 4) % mem.length
 }
-
-
-let e_int = 0;
-let ki = 50000;
-let kp = 0;
 
 function nround(x, n) {
   let factor = 10**n;
   return Math.round(x*factor)/factor;
 }
 
-let time_last = performance.now();
-let dbg = document.getElementById('dbg');
-let steps = 0;
-
-let fps_ref = 30;
 
 const min = (x, y) => x < y ? x : y;
 const max = (x, y) => x > y ? x : y;
@@ -150,21 +144,30 @@ function animate() {
   let fps = 1/dt;
   let hz = steps * fps;
   
-  let e = fps - fps_ref; 
-  e_int += e * dt;
-  steps = max(e_int * ki + e * kp, 1);
+  steps = 100e6*min(dt, 1/120);
+  //what even is this?
 
   dbg.innerText = `
   ${nround(fps, 2)} FPS
   ${nround(hz / 10**6, 2)} MHz
+  ${fps < 40}
   `;
-
   
   for (let i=0; i<steps; i++) vm();
 
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, w, h, 0, gl.RGB, gl.UNSIGNED_BYTE, pixels);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, w, h, 0, gl.RGB, gl.UNSIGNED_BYTE, bytes);
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   requestAnimationFrame(animate);
 }
 
+
+bytes[(w*30 + 3)*3] = 255;
+
 animate();
+
+document.addEventListener('keydown', e => {
+  if (e.key.length == 1) {
+    let off = e.key.charCodeAt(0);
+    bytes[(w*30 + off)*3] ^= off;
+  }
+})
