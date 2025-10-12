@@ -2,6 +2,8 @@ const canvas = document.getElementById('webglCanvas');
 const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
 if (!gl) throw new Error("WebGL not supported");
 
+
+const [w, h] = [800, 600];
 let time_last = performance.now();
 let dbg = document.getElementById('dbg');
 let steps = 0;
@@ -22,7 +24,7 @@ const fs = `
   uniform sampler2D texture;
   varying vec2 uv;
   void main() {
-    gl_FragColor = vec4(texture2D(texture, uv).rgb, 1.0);
+    gl_FragColor = vec4(0.0, texture2D(texture, uv).r, 0.0, 1.0);
   }`;
 
 [gl.VERTEX_SHADER, gl.FRAGMENT_SHADER].forEach((type, i) => {
@@ -51,9 +53,7 @@ gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
-// 5. Animation variables (RGB only)
-const [w, h] = [400, 300];
-const mem = new ArrayBuffer(w * h * 3);
+const mem = new ArrayBuffer(w * h);
 const bytes = new Uint8Array(mem);
 
 
@@ -107,7 +107,7 @@ function fontLoad(font, x1=0, y1=0) {
         x = xoff;
       } else {
         px = c != '.' ? 1 : 0;
-        bytes[(y*w+x)*3] = px * 255;
+        bytes[y*w+x] = px * 255;
         ++x;
       }
     }
@@ -155,19 +155,25 @@ function animate() {
   
   for (let i=0; i<steps; i++) vm();
 
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, w, h, 0, gl.RGB, gl.UNSIGNED_BYTE, bytes);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.LUMINANCE, w, h, 0, gl.LUMINANCE, gl.UNSIGNED_BYTE, bytes);
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   requestAnimationFrame(animate);
 }
 
 
-bytes[(w*30 + 3)*3] = 255;
 
 animate();
 
 document.addEventListener('keydown', e => {
   if (e.key.length == 1) {
     let off = e.key.charCodeAt(0);
-    bytes[(w*30 + off)*3] ^= off;
+    bytes[w*30 + off] = 255;
+  }
+})
+
+document.addEventListener('keyup', e => {
+  if (e.key.length == 1) {
+    let off = e.key.charCodeAt(0);
+    bytes[w*30 + off] = 0;
   }
 })
