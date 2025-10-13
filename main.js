@@ -10,7 +10,7 @@ const mem = new Uint8Array(wB * h);
 
 const program = gl.createProgram();
 
-// WebGL2 Shaders with integer texture support
+
 const vs = `#version 300 es
 in vec2 pos;
 out vec2 uv;
@@ -30,20 +30,17 @@ uniform vec2 size;
 uniform float wB;
 
 uint readBit(vec2 coord) {
-    vec2 pixelPos = coord * size;
-    float x = floor(pixelPos.x);
-    float y = floor(pixelPos.y);
+    vec2 pos = coord * size;
+    float x = floor(pos.x);
+    float y = floor(pos.y);
     
     float iB = floor(x / 8.0);
     float ib = 7.0 - mod(x, 8.0);
     
-    // Use texelFetch for integer texture access
     ivec2 texCoord = ivec2(int(iB), int(y));
-    uint byteData = texelFetch(tex, texCoord, 0).r;
+    uint texel = texelFetch(tex, texCoord, 0).r;
     
-    // Extract bit using integer operations
-    uint bitMask = uint(1u << uint(ib));
-    return (byteData & bitMask) != 0u ? 1u : 0u;
+    return (texel & 1u << uint(ib)) != 0u ? 1u : 0u;
 }
 
 void main() {
@@ -67,7 +64,7 @@ if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
 }
 gl.useProgram(program);
 
-// Full-screen quad
+
 const vertices = new Float32Array([-1,-1, 1,-1, -1,1, 1,1]);
 const buffer = gl.createBuffer();
 gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
@@ -77,7 +74,6 @@ const posLoc = gl.getAttribLocation(program, "pos");
 gl.enableVertexAttribArray(posLoc);
 gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
 
-// Integer texture setup for WebGL2
 const texture = gl.createTexture();
 gl.bindTexture(gl.TEXTURE_2D, texture);
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
@@ -85,16 +81,11 @@ gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
-// Use R8UI format for unsigned byte texture
-gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8UI, wB, h, 0, gl.RED_INTEGER, gl.UNSIGNED_BYTE, mem);
-
 gl.uniform2f(gl.getUniformLocation(program, 'size'), w, h);
 gl.uniform1f(gl.getUniformLocation(program, 'wB'), wB);
 
-// Set texture unit
-gl.uniform1i(gl.getUniformLocation(program, 'tex'), 0);
 
-// Your existing functions remain the same
+
 alphanumerics = `
 .XXX. XXXX. .XXX. XXXX. XXXXX XXXXX .XXX. X...X .XXX. ....X X...X X.... 
 X...X X...X X...X X...X X.... X.... X...X X...X ..X.. ....X X..X. X.... 
@@ -152,7 +143,6 @@ function fontLoad(font, x1=0, y1=0) {
 }
 
 let pc = 0;
-let regs = new Uint32Array(32); // Fixed: was Uint32Array[32]
 
 function vm() {
   pc = (pc + 4) % mem.length;
@@ -194,8 +184,7 @@ function animate() {
   ${fps < 40}
   `;
   
-  // Update the integer texture
-  gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, wB, h, gl.RED_INTEGER, gl.UNSIGNED_BYTE, mem);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8UI, wB, h, 0, gl.RED_INTEGER, gl.UNSIGNED_BYTE, mem);
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   requestAnimationFrame(animate);
 }
