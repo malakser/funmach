@@ -1,53 +1,83 @@
 const canvas = document.getElementById('webglCanvas');
-const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-if (!gl) throw new Error("WebGL not supported");
+const gl = canvas.getContext('webgl2');
+if (!gl) throw new Error("WebGL2 not supported");
 let dbg = document.getElementById('dbg');
 
-
-const wB = 100
+const wB = 100;
 const [w, h] = [wB * 8, 600];
 
 const mem = new Uint8Array(wB * h);
-const texdata = new Uint8Array(w * h);
-
 
 const program = gl.createProgram();
-const vs = `
-  attribute vec2 position;
-  varying vec2 uv;
-  void main() {
-    gl_Position = vec4(position, 0, 1);
-    uv = vec2(position.x * 0.5 + 0.5, -position.y * 0.5 + 0.5);
-  }`;
-//TODO explain uv 0.5
-//
-const fs = `
-  precision highp float;
-  uniform sampler2D texture;
-  varying vec2 uv;
-  void main() {
-    gl_FragColor = vec4(0.0, texture2D(texture, uv).r, 0.0, 1.0);
-  }`;
+
+// WebGL2 Shaders with integer texture support
+const vs = `#version 300 es
+in vec2 pos;
+out vec2 uv;
+void main() {
+    gl_Position = vec4(pos, 0.0, 1.0);
+    uv = vec2(pos.x * 0.5 + 0.5, -pos.y * 0.5 + 0.5);
+}`;
+
+const fs = `#version 300 es
+precision highp float;
+precision highp usampler2D;
+
+in vec2 uv;
+out vec4 fragColor;
+uniform usampler2D tex;
+uniform vec2 size;
+uniform float wB;
+
+uint readBit(vec2 coord) {
+    vec2 pixelPos = coord * size;
+    float x = floor(pixelPos.x);
+    float y = floor(pixelPos.y);
+    
+    float iB = floor(x / 8.0);
+    float ib = 7.0 - mod(x, 8.0);
+    
+    // Use texelFetch for integer texture access
+    ivec2 texCoord = ivec2(int(iB), int(y));
+    uint byteData = texelFetch(tex, texCoord, 0).r;
+    
+    // Extract bit using integer operations
+    uint bitMask = uint(1u << uint(ib));
+    return (byteData & bitMask) != 0u ? 1u : 0u;
+}
+
+void main() {
+    uint bit = readBit(uv);
+    float bitValue = float(bit);
+    fragColor = vec4(bitValue, bitValue, bitValue, 1.0);
+}`;
 
 [gl.VERTEX_SHADER, gl.FRAGMENT_SHADER].forEach((type, i) => {
   const shader = gl.createShader(type);
   gl.shaderSource(shader, [vs, fs][i]);
   gl.compileShader(shader);
+  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+    console.error(gl.getShaderInfoLog(shader));
+  }
   gl.attachShader(program, shader);
 });
 gl.linkProgram(program);
+if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+  console.error(gl.getProgramInfoLog(program));
+}
 gl.useProgram(program);
 
-// 3. Full-screen quad
+// Full-screen quad
 const vertices = new Float32Array([-1,-1, 1,-1, -1,1, 1,1]);
 const buffer = gl.createBuffer();
 gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
 gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
-const posLoc = gl.getAttribLocation(program, "position");
+
+const posLoc = gl.getAttribLocation(program, "pos");
 gl.enableVertexAttribArray(posLoc);
 gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
 
-// 4. RGB Texture setup
+// Integer texture setup for WebGL2
 const texture = gl.createTexture();
 gl.bindTexture(gl.TEXTURE_2D, texture);
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
@@ -55,9 +85,16 @@ gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
+// Use R8UI format for unsigned byte texture
+gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8UI, wB, h, 0, gl.RED_INTEGER, gl.UNSIGNED_BYTE, mem);
 
+gl.uniform2f(gl.getUniformLocation(program, 'size'), w, h);
+gl.uniform1f(gl.getUniformLocation(program, 'wB'), wB);
 
+// Set texture unit
+gl.uniform1i(gl.getUniformLocation(program, 'tex'), 0);
 
+// Your existing functions remain the same
 alphanumerics = `
 .XXX. XXXX. .XXX. XXXX. XXXXX XXXXX .XXX. X...X .XXX. ....X X...X X.... 
 X...X X...X X...X X...X X.... X.... X...X X...X ..X.. ....X X..X. X.... 
@@ -85,8 +122,7 @@ X...X ...X. .x.x. .x.x. ...x. ...x. .x... .x... .x... ...x. .x.x. .x.x.
 ..X.. X.... .x.x. ...x. .x... .x.x. ...x. ...x. .x.x. .x... .x.x. ..x.. 
 ..X.. XXXXX ..x.. ...x. .xxx. ..x.. ...x. .xx.. ..x.. .x... ..x.. .x... 
 ..... ..... ..... ..... ..... ..... ..... ..... ..... ..... ..... ..... 
-`
-
+`;
 
 function fontLoad(font, x1=0, y1=0) {
   let c_last = '\n';
@@ -94,7 +130,7 @@ function fontLoad(font, x1=0, y1=0) {
   let y = x1;
   let xoff = 0;
   let xoff_new = xoff;
-  for (c of font) {
+  for (let c of font) {
     if (c != ' ') { 
       if (c == '\n') {
         if (c_last == '\n') {
@@ -102,28 +138,24 @@ function fontLoad(font, x1=0, y1=0) {
           y = 0;
         } else {
           xoff_new = x;
-          ++y;
+          y++;
         }
         x = xoff;
       } else {
-        px = c != '.' ? 1 : 0;
-        //mem[y*w+x] = px * 255;
+        let px = c != '.' ? 1 : 0;
         bset2(x, y, px);
-        ++x;
+        x++;
       }
     }
     c_last = c;
   }
 }
 
-
-
-
 let pc = 0;
-let regs = Uint32Array[32];
+let regs = new Uint32Array(32); // Fixed: was Uint32Array[32]
 
 function vm() {
-  pc = (pc + 4) % mem.length
+  pc = (pc + 4) % mem.length;
 }
 
 function nround(x, n) {
@@ -131,13 +163,9 @@ function nround(x, n) {
   return Math.round(x*factor)/factor;
 }
 
-
-const min = (x, y) => x < y ? x : y;
-const max = (x, y) => x > y ? x : y;
-
 function bset(i, v) {
   let Bi = Math.floor(i / 8);
-  let bi = i % 8;
+  let bi = 7 - i % 8;
   if (v) mem[Bi] |= (1 << bi);
   else mem[Bi] &= ~(1 << bi);
 }
@@ -147,22 +175,9 @@ function bset2(x, y, v) {
   bset(i, v);
 }
 
-
-
-function texrender() {
-  let sz = w*h;
-  for (let i=0; i<sz; i++) {
-    for (let j=0; j<8; j++) {
-      texdata[i*8 + j] = 255 * !!(mem[i] & (1 << j));
-    }
-  }
-}
-//TODO hack it with shaders
-
-// 6. Animation loop
-
 let time_last = performance.now();
-let steps = 0; //TODO fold in vv
+let steps = 0;
+
 function animate() {
   let time = performance.now();
   let dt = (time - time_last) / 1000;
@@ -170,8 +185,7 @@ function animate() {
   let fps = 1/dt;
   let hz = steps * fps;
   
-  steps = 10e6*min(dt, 1/120);
-  //^^what even is this?
+  steps = 100e6*Math.min(dt, 1/120);
   for (let i=0; i<steps; i++) vm();
 
   dbg.innerText = `
@@ -180,13 +194,11 @@ function animate() {
   ${fps < 40}
   `;
   
-  texrender();
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.LUMINANCE, w, h, 0, gl.LUMINANCE, gl.UNSIGNED_BYTE, texdata);
+  // Update the integer texture
+  gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, wB, h, gl.RED_INTEGER, gl.UNSIGNED_BYTE, mem);
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   requestAnimationFrame(animate);
 }
-
-
 
 fontLoad(alphanumerics);
 animate();
@@ -196,11 +208,11 @@ document.addEventListener('keydown', e => {
     let off = e.key.charCodeAt(0);
     mem[w*30 + off] = 255;
   }
-})
+});
 
 document.addEventListener('keyup', e => {
   if (e.key.length == 1) {
     let off = e.key.charCodeAt(0);
     mem[w*30 + off] = 0;
   }
-})
+});
