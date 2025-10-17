@@ -3,10 +3,10 @@ const gl = canvas.getContext('webgl2');
 if (!gl) throw new Error("WebGL2 not supported");
 let dbg = document.getElementById('dbg');
 
-const wB = 100;
-const [w, h] = [wB * 8, 600];
+const hB = 75;
+const [w, h] = [1024, 8*hB];
 
-const mem = new Uint8Array(wB * h);
+const mem = new Uint8Array(w * hB);
 
 const program = gl.createProgram();
 
@@ -27,17 +27,17 @@ in vec2 uv;
 out vec4 fragColor;
 uniform usampler2D tex;
 uniform vec2 size;
-uniform float wB;
+uniform float hB;
 
 uint readBit(vec2 coord) {
     vec2 pos = coord * size;
     float x = floor(pos.x);
     float y = floor(pos.y);
     
-    float iB = floor(x / 8.0);
-    float ib = 7.0 - mod(x, 8.0);
+    float yB = floor(y / 8.0);
+    float ib = 7.0 - mod(y, 8.0);
     
-    ivec2 texCoord = ivec2(int(iB), int(y));
+    ivec2 texCoord = ivec2(int(x), int(yB));
     uint texel = texelFetch(tex, texCoord, 0).r;
     
     return (texel & 1u << uint(ib)) != 0u ? 1u : 0u;
@@ -82,7 +82,7 @@ gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
 gl.uniform2f(gl.getUniformLocation(program, 'size'), w, h);
-gl.uniform1f(gl.getUniformLocation(program, 'wB'), wB);
+gl.uniform1f(gl.getUniformLocation(program, 'hB'), hB);
 
 
 
@@ -105,13 +105,13 @@ X...X X...X X...X X.... X..X. X...X X...X ..X.. X...X .X.X. X.X.X X...X
 X...X X...X .XXX. X.... .XX.X X...X .XXX. ..X.. .XXX. ..X.. .X.X. X...X 
 ..... ..... ..... ..... ..... ..... ..... ..... ..... ..... ..... ..... 
 
-X...X XXXXX ..x.. ...x. ..x.. ..x.. ...x. .xxx. ...x. .xxx. ..x.. ..x.. 
-X...X ....X .x.x. ..xx. .x.x. .x.x. ..x.. .x... ..x.. ...x. .x.x. .x.x. 
-X...X ...X. .x.x. .x.x. ...x. ...x. .x... .x... .x... ...x. .x.x. .x.x. 
-.X.X. ..X.. .x.x. ...x. ..x.. ..x.. .x.x. ..x.. .xx.. .xx.. ..x.. ..xx. 
-..X.. .X... .x.x. ...x. .x... ...x. .xxx. ...x. .x.x. ..x.. .x.x. ...x. 
-..X.. X.... .x.x. ...x. .x... .x.x. ...x. ...x. .x.x. .x... .x.x. ..x.. 
-..X.. XXXXX ..x.. ...x. .xxx. ..x.. ...x. .xx.. ..x.. .x... ..x.. .x... 
+X...X XXXXX ..X.. ...X. ..X.. ..X.. ...X. .XXX. ...X. .XXX. ..X.. ..X.. 
+X...X ....X .X.X. ..XX. .X.X. .X.X. ..X.. .X... ..X.. ...X. .X.X. .X.X. 
+X...X ...X. .X.X. .X.X. ...X. ...X. .X... .X... .X... ...X. .X.X. .X.X. 
+.X.X. ..X.. .X.X. ...X. ..X.. ..X.. .X.X. ..X.. .XX.. .XX.. ..X.. ..XX. 
+..X.. .X... .X.X. ...X. .X... ...X. .XXX. ...X. .X.X. ..X.. .X.X. ...X. 
+..X.. X.... .X.X. ...X. .X... .X.X. ...X. ...X. .X.X. .X... .X.X. ..X.. 
+..X.. XXXXX ..X.. ...X. .XXX. ..X.. ...X. .XX.. ..X.. .X... ..X.. .X... 
 ..... ..... ..... ..... ..... ..... ..... ..... ..... ..... ..... ..... 
 `;
 
@@ -161,8 +161,11 @@ function bset(i, v) {
 }
 
 function bset2(x, y, v) {
-  let i = w * y + x;
-  bset(i, v);
+  let yB = Math.floor(y / 8);
+  let iB = w * yB + x;
+  let ib = 7 - y % 8;
+  if (v) mem[iB] |= (1 << ib);
+  else mem[iB] &= ~(1 << ib);
 }
 
 let time_last = performance.now();
@@ -184,7 +187,7 @@ function animate() {
   ${fps < 40}
   `;
   
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8UI, wB, h, 0, gl.RED_INTEGER, gl.UNSIGNED_BYTE, mem);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8UI, w, hB, 0, gl.RED_INTEGER, gl.UNSIGNED_BYTE, mem);
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   requestAnimationFrame(animate);
 }
