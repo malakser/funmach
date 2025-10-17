@@ -117,16 +117,16 @@ X...X ...X. .X.X. .X.X. ...X. ...X. .X... .X... .X... ...X. .X.X. .X.X.
 
 function fontLoad(font, x1=0, y1=0) {
   let c_last = '\n';
-  let x = -1;
-  let y = x1;
-  let xoff = 0;
+  let x = x1 - 1; //TODO this does nothing other than declaring x
+  let y = y1;
+  let xoff = x1;
   let xoff_new = xoff;
   for (let c of font) {
     if (c != ' ') { 
       if (c == '\n') {
         if (c_last == '\n') {
           xoff = xoff_new;
-          y = 0;
+          y = y1;
         } else {
           xoff_new = x;
           y++;
@@ -192,7 +192,7 @@ function animate() {
   requestAnimationFrame(animate);
 }
 
-fontLoad(alphanumerics);
+fontLoad(alphanumerics, 8, 8);
 animate();
 
 document.addEventListener('keydown', e => {
